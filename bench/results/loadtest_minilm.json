@@ -1,0 +1,143 @@
+{
+ "label": "embedder=minilm index=faiss mock_latency=300+U(0,600)ms c=32",
+ "requests": 2400,
+ "concurrency": 32,
+ "wall_seconds": 44.46,
+ "throughput_rps": 54.0,
+ "errors": 0,
+ "hits": 1563,
+ "misses": 837,
+ "hit_rate": 0.6512,
+ "false_hits": 8,
+ "false_hit_rate": 0.0051,
+ "hit_rate_convergence_per_200": [
+  0.35,
+  0.56,
+  0.645,
+  0.695,
+  0.71,
+  0.645,
+  0.7,
+  0.675,
+  0.75,
+  0.715,
+  0.72,
+  0.65
+ ],
+ "latency_ms": {
+  "hit": {
+   "p50": 332.7,
+   "p95": 800.7,
+   "p99": 988.7
+  },
+  "miss": {
+   "p50": 944.3,
+   "p95": 1430.2,
+   "p99": 1726.2
+  },
+  "all": {
+   "p50": 448.2,
+   "p95": 1239.9,
+   "p99": 1571.2
+  },
+  "miss_mean": 976.9
+ },
+ "estimated_cost_usd": {
+  "gpt-4o-mini": {
+   "without_cache": 0.3931,
+   "with_cache": 0.1332,
+   "saved": 0.2599,
+   "saved_pct": 66.1
+  },
+  "gpt-4o": {
+   "without_cache": 6.5509,
+   "with_cache": 2.2195,
+   "saved": 4.3314,
+   "saved_pct": 66.1
+  }
+ },
+ "proxy_stats": {
+  "entries": 825,
+  "max_entries": 10000,
+  "lookups": 2400,
+  "hits": 1563,
+  "misses": 837,
+  "hit_rate": 0.6512,
+  "near_misses": 58,
+  "guard_rejections": 52,
+  "stores": 837,
+  "evictions": {
+   "capacity": 0,
+   "expired": 0,
+   "invalidated": 0
+  },
+  "embedder": "all-MiniLM-L6-v2",
+  "index": "faiss",
+  "thresholds": {
+   "classification": {
+    "threshold": 0.88,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   },
+   "creative": {
+    "threshold": 0.97,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   },
+   "general": {
+    "threshold": 0.92,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   }
+  },
+  "estimated_saved_usd": 0.259884,
+  "estimated_upstream_usd": 0.133171,
+  "embed_batches": 250,
+  "embed_mean_batch": 9.6
+ },
+ "false_hit_examples": [
+  {
+   "request": "How can I change my profile pic on Quora?",
+   "served_answer_for": "How can I change my profile picture on Quora?",
+   "similarity": "0.9828"
+  },
+  {
+   "request": "What are your New Year's resolutions for 2017?",
+   "served_answer_for": "What are your New Year resolutions for the upcoming year 2017?",
+   "similarity": "0.9719"
+  },
+  {
+   "request": "How can I order a dictionary by key in Python?",
+   "served_answer_for": "ok so how can i order a dictionary by value in python :)",
+   "similarity": "0.9364"
+  },
+  {
+   "request": "How can I order a dictionary by key in Python?",
+   "served_answer_for": "ok so how can i order a dictionary by value in python :)",
+   "similarity": "0.9364"
+  },
+  {
+   "request": "Why can't I delete my question on Quora?",
+   "served_answer_for": "Why can\u2019t I delete my own Quora question?",
+   "similarity": "0.9395"
+  },
+  {
+   "request": "how do i sort a dictionary by key in python?",
+   "served_answer_for": "How do I sort a dictionary by value in Python?",
+   "similarity": "0.9340"
+  },
+  {
+   "request": "Where can I get high quality print solutions and service in Sydney for envelopes?",
+   "served_answer_for": "Where can I get very cost-effective envelope printing service in Sydney?",
+   "similarity": "0.9368"
+  },
+  {
+   "request": "How do I forget someone whom I once loved and cared for deeply?",
+   "served_answer_for": "How can I forget someone whom I loved so deeply?",
+   "similarity": "0.9393"
+  }
+ ]
+}

@@ -1,0 +1,138 @@
+{
+ "label": "embedder=hashing index=faiss mock_latency=300+U(0,600)ms c=32 limit=0",
+ "requests": 2400,
+ "concurrency": 32,
+ "wall_seconds": 18.99,
+ "throughput_rps": 126.4,
+ "errors": 0,
+ "hits": 1499,
+ "misses": 901,
+ "hit_rate": 0.6246,
+ "false_hits": 7,
+ "false_hit_rate": 0.0047,
+ "hit_rate_convergence_per_200": [
+  0.355,
+  0.525,
+  0.59,
+  0.67,
+  0.66,
+  0.64,
+  0.71,
+  0.635,
+  0.715,
+  0.695,
+  0.71,
+  0.59
+ ],
+ "latency_ms": {
+  "hit": {
+   "p50": 13.0,
+   "p95": 27.4,
+   "p99": 38.5
+  },
+  "miss": {
+   "p50": 640.4,
+   "p95": 892.1,
+   "p99": 920.4
+  },
+  "all": {
+   "p50": 19.3,
+   "p95": 846.2,
+   "p99": 905.5
+  },
+  "miss_mean": 633.4
+ },
+ "estimated_cost_usd": {
+  "gpt-4o-mini": {
+   "without_cache": 0.3892,
+   "with_cache": 0.1437,
+   "saved": 0.2455,
+   "saved_pct": 63.1
+  },
+  "gpt-4o": {
+   "without_cache": 6.4863,
+   "with_cache": 2.3947,
+   "saved": 4.0916,
+   "saved_pct": 63.1
+  }
+ },
+ "proxy_stats": {
+  "entries": 862,
+  "max_entries": 10000,
+  "lookups": 2400,
+  "hits": 1499,
+  "misses": 901,
+  "hit_rate": 0.6246,
+  "near_misses": 33,
+  "guard_rejections": 22,
+  "stores": 901,
+  "evictions": {
+   "capacity": 0,
+   "expired": 0,
+   "invalidated": 0
+  },
+  "embedder": "hashing-256",
+  "index": "faiss",
+  "thresholds": {
+   "classification": {
+    "threshold": 0.88,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   },
+   "creative": {
+    "threshold": 0.97,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   },
+   "general": {
+    "threshold": 0.92,
+    "worst_false_hit": -1.0,
+    "good_feedback": 0.0,
+    "bad_feedback": 0.0
+   }
+  },
+  "estimated_saved_usd": 0.245494,
+  "estimated_upstream_usd": 0.143682,
+  "embed_batches": 1490,
+  "embed_mean_batch": 1.61
+ },
+ "false_hit_examples": [
+  {
+   "request": "What is one mile in kilometres?",
+   "served_answer_for": "quick question: what is one kilometre in miles asap",
+   "similarity": "0.9232"
+  },
+  {
+   "request": "hey, what is one mile in kilometres?",
+   "served_answer_for": "quick question: what is one kilometre in miles asap",
+   "similarity": "0.9232"
+  },
+  {
+   "request": "What is one mile in kilometres?",
+   "served_answer_for": "quick question: what is one kilometre in miles asap",
+   "similarity": "0.9232"
+  },
+  {
+   "request": "What is one mile in kilometres?",
+   "served_answer_for": "quick question: what is one kilometre in miles asap",
+   "similarity": "0.9232"
+  },
+  {
+   "request": "What is one mile in kilometres?",
+   "served_answer_for": "quick question: what is one kilometre in miles asap",
+   "similarity": "0.9232"
+  },
+  {
+   "request": "What is the corporate culture like at Apache? How is the culture different than other companies?",
+   "served_answer_for": "What is the corporate culture like at Sprint? How is the culture different than other companies?",
+   "similarity": "0.9609"
+  },
+  {
+   "request": "What is the corporate culture like at CSS Industries? How is the culture different than other companies?",
+   "served_answer_for": "What is the corporate culture like at Sprint? How is the culture different than other companies?",
+   "similarity": "0.9311"
+  }
+ ]
+}

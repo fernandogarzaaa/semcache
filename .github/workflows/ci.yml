@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check src tests bench scripts
+      - run: mypy
+
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ matrix.python }}", cache: pip}
+      # No API keys and no model downloads: the hashing embedder and the mock upstream stand in.
+      - run: pip install -e ".[dev,faiss]"
+      - run: python -m pytest -q -m "not slow" -rs
+      - name: End-to-end (real processes)
+        run: python -m pytest -q -m slow -rs
+      - name: Without faiss (numpy index only)
+        if: matrix.python == '3.10'
+        run: pip uninstall -y faiss-cpu && python -m pytest -q -m "not slow" -rs
+
+  wheel:
+    name: Wheel smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install build && python -m build
+      - name: Install the wheel in a clean venv
+        run: |
+          python -m venv /tmp/w && . /tmp/w/bin/activate
+          pip install dist/*.whl
+          cd /tmp && semcache --version && semcache tune --help >/dev/null
+
+  docker:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: semcache:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Proxy + mock upstream containers
+        run: |
+          docker network create sc
+          docker run -d --name mock --network sc semcache:ci mock-upstream --host 0.0.0.0 --port 9000 --latency-ms 50
+          docker run -d --name proxy --network sc -p 8080:8080 -e SEMCACHE_UPSTREAM_URL=http://mock:9000/v1 semcache:ci
+          for i in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 2; done
+          test "$(docker inspect -f '{{.Config.User}}' semcache:ci)" = "10001:10001"
+          B='{"model":"gpt-4o-mini","messages":[{"role":"user","content":"What is the capital of Canada?"}]}'
+          curl -sfi localhost:8080/v1/chat/completions -H 'content-type: application/json' -d "$B" | grep -i '^x-semcache: miss'
+          curl -sfi localhost:8080/v1/chat/completions -H 'content-type: application/json' -d "$B" | grep -i '^x-semcache: hit'
+          curl -sf localhost:8080/metrics | grep -q 'semcache_requests_total{model="gpt-4o-mini",result="hit"} 1.0'
+          for i in $(seq 1 20); do s=$(docker inspect -f '{{.State.Health.Status}}' proxy); [ "$s" = healthy ] && break; sleep 3; done
+          docker inspect -f '{{.State.Health.Status}}' proxy | grep -q healthy
+      - name: Compose config is valid
+        run: docker compose config -q
+      - if: failure()
+        run: docker logs proxy; docker logs mock
+
+  mutation:
+    name: Mutation score (testteeth, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e ".[dev,faiss,mutation]"
+      - run: scripts/mutation.sh
+      - run: python scripts/mutation_summary.py | tee -a "$GITHUB_STEP_SUMMARY"

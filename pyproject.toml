@@ -1,0 +1,112 @@
+[build-system]
+requires = ["hatchling>=1.24,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "semcache"
+dynamic = ["version"]
+description = "A drop-in semantic caching layer for OpenAI-compatible LLM APIs: embedding-similarity lookup, TTL tiers, invalidation, adaptive thresholds, near-miss analysis and Prometheus metrics."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Fernando Garza", email = "fernandogarzaaa@gmail.com" }]
+keywords = ["llm", "cache", "semantic-cache", "openai", "proxy", "embeddings", "faiss", "fastapi"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+dependencies = [
+  "fastapi>=0.110,<1",
+  "httpx>=0.27,<1",
+  "uvicorn>=0.29,<1",
+  "pydantic>=2.5,<3",
+  "numpy>=1.24,<3",
+  "prometheus-client>=0.19,<1",
+]
+
+[project.optional-dependencies]
+faiss = ["faiss-cpu>=1.8,<2"]
+local = ["sentence-transformers>=2.7,<7"]
+bench = ["pyarrow>=14"]
+dev = [
+  "pytest>=8,<10",
+  "pytest-asyncio>=0.23,<2",
+  "ruff>=0.6",
+  "mypy>=1.10",
+  "build>=1.2",
+]
+mutation = ["testteeth>=0.2,<1"]
+
+[project.scripts]
+semcache = "semcache.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/fernandogarzaaa/semcache"
+Repository = "https://github.com/fernandogarzaaa/semcache"
+Issues = "https://github.com/fernandogarzaaa/semcache/issues"
+
+[tool.hatch.version]
+path = "src/semcache/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/semcache"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/semcache", "tests", "bench", "deploy", "docs", "README.md", "LICENSE", "pyproject.toml", "Makefile"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["slow: end-to-end tests that start real server processes"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv", "bench/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["UP006", "UP007", "UP035", "UP045", "B008", "SIM105", "RUF012", "RUF022", "RUF046", "SIM905", "SIM114"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B", "SIM", "RUF", "E501"]
+"bench/*" = ["E501", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+plugins = ["pydantic.mypy"]
+files = ["src/semcache"]
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["faiss", "faiss.*", "sentence_transformers", "sentence_transformers.*"]
+ignore_missing_imports = true
+
+[tool.testteeth]
+# Mutation testing of the dependency-light core (https://pypi.org/project/testteeth/).
+paths = [
+  "src/semcache/keys.py",
+  "src/semcache/normalize.py",
+  "src/semcache/policy.py",
+  "src/semcache/cache.py",
+  "src/semcache/index.py",
+  "src/semcache/tuner.py",
+  "src/semcache/pricing.py",
+  "src/semcache/streaming.py",
+  "src/semcache/embedders.py",
+]
+test_args = ["tests/unit", "-q", "-x", "-p", "no:cacheprovider"]

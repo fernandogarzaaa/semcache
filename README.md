@@ -252,7 +252,7 @@ make mutation    # testteeth mutation score of the core modules
 make bench       # regenerate the workload, sweep, and load test (downloads QQP and MiniLM)
 ```
 
-**Test quality.** 226 tests (225 unit and integration, 1 end-to-end). Mutation testing with [testteeth](https://pypi.org/project/testteeth/) over the dependency-light core (`keys`, `normalize`, `embedders`, `policy`, `cache`, `index`, `tuner`, `pricing`, `streaming`) kills **94.4% (612 / 648)** of generated mutants. CI runs lint, the test matrix on Python 3.10–3.12 (plus one run without FAISS), a wheel install smoke test, a Docker build with a proxy-plus-mock container smoke test, and the mutation score as a non-blocking job.
+**Test quality.** 226 tests (225 unit and integration, 1 end-to-end). Mutation testing with [testteeth](https://pypi.org/project/testteeth/) over the dependency-light core (`keys`, `normalize`, `embedders`, `policy`, `cache`, `index`, `tuner`, `pricing`, `streaming`) kills **94.3% (611 / 648)** of generated mutants (CI run of 2026-10-11; lowest module is `index.py` at 85.5%, `keys.py` and `streaming.py` are at 100%). CI runs lint, the test matrix on Python 3.10–3.12 (plus one run without FAISS), a wheel install smoke test, a Docker build with a proxy-plus-mock container smoke test, and the mutation score as a non-blocking job.
 
 ## License
 

@@ -13,6 +13,8 @@ from semcache.upstream import Router, UpstreamClient
 def make(settings=None, routes_json=""):
     mock = create_mock_app()
     s = settings or Settings()
+    if not s.admin_token:
+        s.admin_open = True  # these tests exercise the admin API without a token
     s.upstream_url = "http://mock/v1"
     s.prices_json = '{"mock-gpt": [1.0, 2.0]}'
     s.index = "numpy"

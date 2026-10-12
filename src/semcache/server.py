@@ -9,10 +9,21 @@ Request headers an application may send (all optional):
 * ``X-Semcache-Threshold: 0.9`` override the similarity threshold for this request
 * ``X-Semcache-TTL: 600``       override the TTL (seconds) of the entry this request creates
 * ``X-Semcache-Tags: a,b``      tag the stored entry, for invalidation by tag
+* ``X-Semcache-Key: <token>``   proxy token, when ``SEMCACHE_PROXY_TOKENS`` is set
+                                 (``Authorization: Bearer <token>`` also works)
+
+Isolation: every cache entry belongs to a tenant. With proxy tokens, the
+tenant is the token's tenant; otherwise it is a hash of the caller's
+``Authorization`` header. The caller is identified *before* any cache lookup,
+so a cached answer is never served to a caller that did not present the same
+credential (``SEMCACHE_SHARED_CACHE=1`` opts out, for single-tenant use).
+Admin endpoints (``/v1/cache/*``) require ``SEMCACHE_ADMIN_TOKEN`` and are
+disabled when it is not set.
 """
 
 from __future__ import annotations
 
+import hmac
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -132,6 +143,53 @@ def _float_header(value: Optional[str], name: str) -> Optional[float]:
         raise HTTPException(400, f"{name} must be a number") from None
 
 
+def _bearer(authorization: Optional[str]) -> str:
+    if authorization and authorization[:7].lower() == "bearer ":
+        return authorization[7:].strip()
+    return ""
+
+
+def _token_equal(a: str, b: str) -> bool:
+    return bool(a) and bool(b) and hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+
+
+@dataclass(frozen=True)
+class Caller:
+    tenant: str
+    upstream_auth: Optional[str]  # what may be forwarded upstream as Authorization
+
+
+def tenant_for(settings: Settings, authorization: Optional[str], semcache_key: Optional[str]) -> Caller:
+    """Identify the caller before touching the cache.
+
+    * Proxy tokens configured: ``X-Semcache-Key`` or ``Authorization: Bearer``
+      must carry a known token (else 401). A token sent via Authorization is
+      never forwarded upstream.
+    * Otherwise: the tenant is a hash of the caller's Authorization header
+      (callers without one share the ``anon`` partition).
+    """
+    if settings.proxy_tokens:
+        presented = (semcache_key or "").strip()
+        via_auth = False
+        if not presented:
+            presented, via_auth = _bearer(authorization), True
+        tenant = None
+        for token, name in settings.proxy_tokens.items():
+            if _token_equal(presented, token):
+                tenant = name
+        if tenant is None:
+            raise HTTPException(401, "a valid semcache proxy token is required", headers={"WWW-Authenticate": "Bearer"})
+        return Caller(
+            tenant="" if settings.shared_cache else "tenant:" + tenant,
+            upstream_auth=None if via_auth else authorization,
+        )
+    if settings.shared_cache:
+        return Caller(tenant="", upstream_auth=authorization)
+    if not authorization:
+        return Caller(tenant="anon", upstream_auth=None)
+    return Caller(tenant="auth:" + sha256_hex(authorization)[:32], upstream_auth=authorization)
+
+
 def create_app(
     settings: Optional[Settings] = None,
     *,
@@ -157,7 +215,11 @@ def create_app(
 
     def require_admin(authorization: Optional[str] = Header(default=None)) -> None:
         token = st.settings.admin_token
-        if token and authorization != f"Bearer {token}":
+        if not token:
+            if st.settings.admin_open:
+                return
+            raise HTTPException(403, "admin API disabled: set SEMCACHE_ADMIN_TOKEN")
+        if not _token_equal(_bearer(authorization), token):
             raise HTTPException(401, "admin token required")
 
     def _refresh_gauges() -> None:
@@ -181,8 +243,12 @@ def create_app(
         return Response(generate_latest(m.registry), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/v1/models")
-    async def models(authorization: Optional[str] = Header(default=None)) -> JSONResponse:
-        status, data = await st.upstream.models(authorization)
+    async def models(
+        authorization: Optional[str] = Header(default=None),
+        x_semcache_key: Optional[str] = Header(default=None),
+    ) -> JSONResponse:
+        caller = tenant_for(st.settings, authorization, x_semcache_key)
+        status, data = await st.upstream.models(caller.upstream_auth)
         return JSONResponse(data, status_code=status)
 
     @app.post("/v1/chat/completions")
@@ -193,8 +259,12 @@ def create_app(
         x_semcache_threshold: Optional[str] = Header(default=None),
         x_semcache_ttl: Optional[str] = Header(default=None),
         x_semcache_tags: Optional[str] = Header(default=None),
+        x_semcache_key: Optional[str] = Header(default=None),
     ) -> Response:
         started = time.perf_counter()
+        # Authenticate / identify the caller before any cache access.
+        caller = tenant_for(st.settings, authorization, x_semcache_key)
+        authorization = caller.upstream_auth
         try:
             body = await request.json()
         except ValueError:
@@ -207,7 +277,7 @@ def create_app(
         ttl_override = _float_header(x_semcache_ttl, "X-Semcache-TTL")
         tags = [t.strip() for t in (x_semcache_tags or "").split(",") if t.strip()]
 
-        key = build_key(body)
+        key = build_key(body, tenant=caller.tenant)
         reason = ""
         if not st.settings.enabled:
             reason = "disabled"

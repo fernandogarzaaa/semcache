@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0 (2026-10-13)
+
+First tagged release.
+
 ### Security (Oct 2026 audit)
 - Cache entries are partitioned per caller (proxy-token tenant, or a hash of the
   caller's `Authorization` header) and the caller is identified before any cache
@@ -14,7 +18,7 @@
 - `semcache serve` binds `127.0.0.1` by default and refuses open-relay binds.
 - SECURITY.md.
 
-## 0.1.0 (unreleased)
+### Features
 
 - OpenAI-compatible caching proxy with streaming, namespace/query key split, word-order guard.
 - MiniLM (CPU) and hashing embedders, NumPy and FAISS indexes, embed micro-batching.

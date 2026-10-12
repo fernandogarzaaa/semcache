@@ -3,11 +3,38 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
+import os
 import sys
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Mapping, Optional
 
 from . import __version__
+
+if TYPE_CHECKING:
+    from .config import Settings
+
+
+def is_loopback(host: str) -> bool:
+    host = host.strip().strip("[]")
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def unsafe_bind_reason(host: str, settings: Settings, env: Optional[Mapping[str, str]] = None) -> str:
+    """Why serving on ``host`` with ``settings`` would be an open relay, or ''."""
+    e = os.environ if env is None else env
+    if is_loopback(host) or e.get("SEMCACHE_ALLOW_OPEN", "").strip().lower() in ("1", "true", "yes"):
+        return ""
+    if settings.admin_open and not settings.admin_token:
+        return "SEMCACHE_ADMIN_OPEN exposes the admin API without a token"
+    if settings.has_server_side_keys() and not settings.proxy_tokens:
+        return "the proxy spends a server-side provider key but SEMCACHE_PROXY_TOKENS is not set"
+    return ""
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -21,6 +48,15 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         settings.upstream_url = args.upstream
     if args.embedder:
         settings.embedder = args.embedder
+    reason = unsafe_bind_reason(args.host, settings)
+    if reason:
+        print(
+            f"semcache: refusing to listen on {args.host}: {reason}. "
+            "Set SEMCACHE_PROXY_TOKENS / SEMCACHE_ADMIN_TOKEN, bind 127.0.0.1, "
+            "or set SEMCACHE_ALLOW_OPEN=1 if this is intentional.",
+            file=sys.stderr,
+        )
+        return 2
     print(json.dumps({"semcache": __version__, **settings.redacted()}, default=str), file=sys.stderr)
     uvicorn.run(create_app(settings), host=args.host, port=args.port, log_level=args.log_level, access_log=False)
     return 0
@@ -76,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("serve", help="run the caching proxy")
-    s.add_argument("--host", default="0.0.0.0")
+    s.add_argument("--host", default=os.environ.get("SEMCACHE_HOST", "127.0.0.1"))
     s.add_argument("--port", type=int, default=8080)
     s.add_argument("--upstream", default="", help="OpenAI-compatible base URL (overrides SEMCACHE_UPSTREAM_URL)")
     s.add_argument("--embedder", default="", help="hashing | minilm (overrides SEMCACHE_EMBEDDER)")

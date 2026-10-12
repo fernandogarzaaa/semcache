@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Security (Oct 2026 audit)
+- Cache entries are partitioned per caller (proxy-token tenant, or a hash of the
+  caller's `Authorization` header) and the caller is identified before any cache
+  lookup, so cached answers are no longer served across keys or to callers
+  without a valid key. `SEMCACHE_SHARED_CACHE=1` opts back into one shared cache.
+- Optional proxy authentication: `SEMCACHE_PROXY_TOKENS` (`X-Semcache-Key` or
+  `Authorization: Bearer`).
+- Admin endpoints are disabled until `SEMCACHE_ADMIN_TOKEN` is set
+  (`SEMCACHE_ADMIN_OPEN=1` for local dev); constant-time token comparison.
+- `semcache serve` binds `127.0.0.1` by default and refuses open-relay binds.
+- SECURITY.md.
+
 ## 0.1.0 (unreleased)
 
 - OpenAI-compatible caching proxy with streaming, namespace/query key split, word-order guard.

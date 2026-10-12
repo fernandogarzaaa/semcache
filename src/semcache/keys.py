@@ -9,6 +9,11 @@ A semantic cache has two halves of a key:
 * the **query text**, the last user message, which is embedded and compared by
   cosine similarity *within* a namespace only.
 
+The namespace also includes the caller's **tenant** (see ``server.tenant_for``):
+the proxy token's tenant, or a hash of the caller's ``Authorization`` header.
+Callers with different keys therefore never share answers, and a cached answer
+is only served to a caller presenting the same credential that created it.
+
 Splitting it this way is what stops cross-contamination: "Summarise this" under
 a legal-review system prompt can never be answered from the same words under a
 marketing system prompt, and a temperature 0 answer is never served to a
@@ -106,10 +111,12 @@ class CacheKey:
     system_hash: str
 
 
-def build_key(body: Mapping[str, Any]) -> Optional[CacheKey]:
+def build_key(body: Mapping[str, Any], tenant: str = "") -> Optional[CacheKey]:
     """Split a chat-completions body into (namespace, query text).
 
-    Returns ``None`` when the request has no user message to key on.
+    ``tenant`` partitions the cache: two requests only share a namespace when
+    their tenants are equal. Returns ``None`` when the request has no user
+    message to key on.
     """
     messages = list(body.get("messages") or [])
     idx = last_user_index(messages)
@@ -124,7 +131,7 @@ def build_key(body: Mapping[str, Any]) -> Optional[CacheKey]:
         for i, m in enumerate(messages)
         if i != idx
     ]
-    payload = {"model": model, "params": params, "context": context}
+    payload = {"tenant": tenant, "model": model, "params": params, "context": context}
     return CacheKey(
         namespace=sha256_hex(canonical_json(payload))[:32],
         query=message_text(messages[idx]),

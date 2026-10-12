@@ -62,7 +62,7 @@ With Docker (hashing embedder, no model download), the full stack with Prometheu
 docker compose up --build    # proxy :8080, Grafana :3000, Prometheus :9090, mock upstream
 ```
 
-To use a real provider, set `SEMCACHE_UPSTREAM_URL=https://api.openai.com/v1` and send your normal `Authorization: Bearer ...` header; semcache forwards the client's header unless `SEMCACHE_UPSTREAM_API_KEY` is set.
+To use a real provider, set `SEMCACHE_UPSTREAM_URL=https://api.openai.com/v1` and send your normal `Authorization: Bearer ...` header; semcache forwards the client's header unless `SEMCACHE_UPSTREAM_API_KEY` is set (then also set `SEMCACHE_PROXY_TOKENS`, see [Security](#security)).
 
 ## How a request flows
 
@@ -193,10 +193,38 @@ Everything is an environment variable (`config.py`); there is no config file.
 | `SEMCACHE_TTL_SHORT` / `_DEFAULT` / `_LONG` | 3600 / 21600 / 604800 s | Freshness tiers |
 | `SEMCACHE_NEAR_MISS_WINDOW` | `0.05` | Log lookups within this distance below the threshold |
 | `SEMCACHE_EMBED_BATCH` / `SEMCACHE_EMBED_WAIT_MS` | 32 / 2.0 | Micro-batching |
-| `SEMCACHE_ADMIN_TOKEN` | (empty) | Bearer token required on `/v1/cache/*` when set |
+| `SEMCACHE_ADMIN_TOKEN` | (empty) | Bearer token required on `/v1/cache/*`; **the admin API is disabled (403) while it is empty** |
+| `SEMCACHE_ADMIN_OPEN` | `false` | Local development only: allow `/v1/cache/*` without a token |
+| `SEMCACHE_PROXY_TOKENS` | (empty) | `tenant:token,...` (or bare `token,...`). When set, every proxy request must send one (`X-Semcache-Key` or `Authorization: Bearer`) and the cache is partitioned per tenant |
+| `SEMCACHE_SHARED_CACHE` | `false` | Opt-in: let all callers share cached answers (single-tenant deployments only) |
+| `SEMCACHE_HOST` | `127.0.0.1` | Default bind for `semcache serve` (`--host` overrides) |
+| `SEMCACHE_ALLOW_OPEN` | (empty) | `1` lets `serve` bind a non-loopback host even when it would be an open relay (see Security) |
 | `SEMCACHE_ENABLED` | `true` | `false` turns semcache into a plain pass-through |
 
-Per-request headers: `X-Semcache-Bypass: 1`, `X-Semcache-Threshold: 0.95`, `X-Semcache-TTL: 600`, `X-Semcache-Tags: billing,faq` (tags can be invalidated later).
+Per-request headers: `X-Semcache-Bypass: 1`, `X-Semcache-Threshold: 0.95`, `X-Semcache-TTL: 600`, `X-Semcache-Tags: billing,faq` (tags can be invalidated later), `X-Semcache-Key: <proxy token>`.
+
+## Security
+
+- **Cache isolation.** The caller is identified before any cache lookup and the
+  identity is part of the cache namespace: the proxy-token tenant when
+  `SEMCACHE_PROXY_TOKENS` is set, otherwise a hash of the caller's
+  `Authorization` header. A cached answer is only served to a caller that
+  presents the same credential (or the same tenant's token); a wrong or missing
+  key lands in its own empty partition and goes upstream, where the provider
+  rejects it. Callers without any `Authorization` share one `anon` partition.
+  `SEMCACHE_SHARED_CACHE=1` restores one shared cache, for single-tenant use.
+- **Proxy tokens.** With a server-side provider key (`SEMCACHE_UPSTREAM_API_KEY`
+  or keyed `SEMCACHE_ROUTES`) anyone who can reach the proxy spends your key, so
+  set `SEMCACHE_PROXY_TOKENS`. A token sent as `Authorization` is never
+  forwarded upstream.
+- **Admin API** (`/v1/cache/*`: entries contain prompts and answers) is off until
+  `SEMCACHE_ADMIN_TOKEN` is set; the token is compared in constant time.
+- **Binding.** `semcache serve` binds `127.0.0.1` by default. It refuses a
+  non-loopback `--host` when it spends a server-side key without proxy tokens, or
+  when the admin API is open without a token, unless `SEMCACHE_ALLOW_OPEN=1`. The
+  Docker image binds `0.0.0.0` inside the container; pass-through mode (callers
+  send their own provider keys) is allowed there because the cache is partitioned
+  per key.
 
 ## Operating it
 

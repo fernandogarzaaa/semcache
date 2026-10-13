@@ -122,6 +122,49 @@ async def test_bad_bodies():
         assert r.status_code == 400
 
 
+async def test_malformed_messages_and_temperature_are_400_not_500():
+    client, _, _ = make()
+    async with client:
+        for body in (
+            {"model": "m", "messages": [None]},
+            {"model": "m", "messages": [{"role": "user", "content": "hello"}, 5]},
+            {
+                "model": "m",
+                "messages": [{"role": "user", "content": "Write a poem about the sea"}],
+                "temperature": "hot",
+            },
+            {
+                "model": "m",
+                "messages": [{"role": "user", "content": "Write a poem about the sea"}],
+                "temperature": True,
+            },
+        ):
+            r = await client.post("/v1/chat/completions", json=body)
+            assert r.status_code == 400, body
+        ok = await client.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": [{"role": "user", "content": "Write a poem"}], "temperature": 0.2},
+        )
+        assert ok.status_code == 200
+
+
+async def test_override_headers_reject_non_finite_and_out_of_range():
+    client, _, _ = make()
+    async with client:
+        for name, value in (
+            ("X-Semcache-Threshold", "nan"),
+            ("X-Semcache-Threshold", "inf"),
+            ("X-Semcache-Threshold", "1.5"),
+            ("X-Semcache-Threshold", "-0.1"),
+            ("X-Semcache-TTL", "-5"),
+            ("X-Semcache-TTL", "nan"),
+        ):
+            r = await client.post("/v1/chat/completions", json=chat("x"), headers={name: value})
+            assert r.status_code == 400, (name, value)
+        r = await client.post("/v1/chat/completions", json=chat("x"), headers={"X-Semcache-TTL": "0"})
+        assert r.status_code == 200
+
+
 async def test_upstream_errors_and_truncation_not_cached():
     client, _, mock = make()
     async with client:

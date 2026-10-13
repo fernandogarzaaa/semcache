@@ -24,6 +24,7 @@ disabled when it is not set.
 from __future__ import annotations
 
 import hmac
+import math
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -134,13 +135,31 @@ def build_state(
     )
 
 
-def _float_header(value: Optional[str], name: str) -> Optional[float]:
+def _float_header(value: Optional[str], name: str, lo: float = 0.0, hi: float = math.inf) -> Optional[float]:
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        out = float(value)
     except ValueError:
         raise HTTPException(400, f"{name} must be a number") from None
+    # float() accepts "nan"/"inf"; a NaN threshold silently disables hits and a
+    # negative TTL stores entries that are already expired.
+    if not math.isfinite(out) or not lo <= out <= hi:
+        raise HTTPException(400, f"{name} must be a finite number in [{lo:g}, {hi:g}]")
+    return out
+
+
+def _validate_chat_body(body: Any) -> None:
+    """Reject request shapes that would otherwise crash key building or policy with a 500."""
+    if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
+        raise HTTPException(400, "expected a chat completions body with a 'messages' list")
+    if not all(isinstance(msg, dict) for msg in body["messages"]):
+        raise HTTPException(400, "every item in 'messages' must be an object")
+    temperature = body.get("temperature")
+    if temperature is not None and (
+        isinstance(temperature, bool) or not isinstance(temperature, (int, float)) or not math.isfinite(temperature)
+    ):
+        raise HTTPException(400, "'temperature' must be a number")
 
 
 def _bearer(authorization: Optional[str]) -> str:
@@ -269,11 +288,10 @@ def create_app(
             body = await request.json()
         except ValueError:
             raise HTTPException(400, "request body must be JSON") from None
-        if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
-            raise HTTPException(400, "expected a chat completions body with a 'messages' list")
+        _validate_chat_body(body)
         model = str(body.get("model", ""))
         stream = bool(body.get("stream"))
-        threshold_override = _float_header(x_semcache_threshold, "X-Semcache-Threshold")
+        threshold_override = _float_header(x_semcache_threshold, "X-Semcache-Threshold", 0.0, 1.0)
         ttl_override = _float_header(x_semcache_ttl, "X-Semcache-TTL")
         tags = [t.strip() for t in (x_semcache_tags or "").split(",") if t.strip()]
 

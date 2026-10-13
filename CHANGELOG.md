@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.1.1 (2026-10-13)
+
+### Fixed
+- Malformed requests now get a 400 instead of a 500: a non-object item in
+  `messages` (e.g. `[null]`) and a non-numeric `temperature` on a creative
+  prompt both crashed the handler.
+- `X-Semcache-Threshold` must be a finite number in [0, 1] and `X-Semcache-TTL`
+  a finite number >= 0. `nan` previously disabled hits silently and a negative
+  TTL stored already-expired entries.
+
 ## 0.1.0 (2026-10-13)
 
 First tagged release.
